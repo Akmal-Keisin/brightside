@@ -53,8 +53,6 @@ class HandleInertiaRequests extends Middleware
                     'bio' => $user->bio,
                     'created_at' => $user->created_at?->toIso8601String(),
                     'updated_at' => $user->updated_at?->toIso8601String(),
-                    'two_factor_enabled' => $user->two_factor_confirmed_at !== null,
-                    'two_factor_pending' => $user->two_factor_secret !== null && $user->two_factor_confirmed_at === null,
                 ] : null,
             ],
             'flash' => [

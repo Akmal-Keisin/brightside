@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Middleware\EnsureAdmin;
-use App\Http\Middleware\EnsureAdminTwoFactor;
 use App\Http\Middleware\EnsureCourseEnrollment;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -28,7 +27,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => EnsureAdmin::class,
-            'admin.2fa' => EnsureAdminTwoFactor::class,
             'course.access' => EnsureCourseEnrollment::class,
         ]);
 

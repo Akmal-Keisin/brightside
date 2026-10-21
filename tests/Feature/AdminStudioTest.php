@@ -2,7 +2,6 @@
 
 use App\Enums\CourseStatus;
 use App\Enums\EnrollmentSource;
-use App\Enums\UserRole;
 use App\Models\Category;
 use App\Models\Chapter;
 use App\Models\Content;
@@ -18,15 +17,7 @@ test('members cannot enter the admin studio', function () {
         ->assertForbidden();
 });
 
-test('admins without two factor are sent to security settings', function () {
-    $admin = User::factory()->create(['role' => UserRole::Admin]);
-
-    $this->actingAs($admin)
-        ->get(route('admin.dashboard'))
-        ->assertRedirect(route('security.edit'));
-});
-
-test('admins with two factor can open the studio', function () {
+test('admins can open the studio', function () {
     $this->actingAs(User::factory()->admin()->create())
         ->get(route('admin.dashboard'))
         ->assertOk();

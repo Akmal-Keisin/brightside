@@ -76,10 +76,6 @@ class CreateAdmin extends Command
             $this->components->info("Created administrator {$user->email}.");
         }
 
-        if ($user->two_factor_confirmed_at === null) {
-            $this->components->warn('Two-factor authentication is required for studio access. Enable it under Settings → Security after logging in.');
-        }
-
         return self::SUCCESS;
     }
 }

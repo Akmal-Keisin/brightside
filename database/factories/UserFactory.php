@@ -46,18 +46,6 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'role' => UserRole::Admin,
-            'two_factor_secret' => encrypt('test-secret'),
-            'two_factor_recovery_codes' => encrypt(json_encode(['recovery-code-1', 'recovery-code-2'])),
-            'two_factor_confirmed_at' => now(),
-        ]);
-    }
-
-    public function withTwoFactor(): static
-    {
-        return $this->state(fn (array $attributes): array => [
-            'two_factor_secret' => encrypt('test-secret'),
-            'two_factor_recovery_codes' => encrypt(json_encode(['recovery-code-1', 'recovery-code-2'])),
-            'two_factor_confirmed_at' => now(),
         ]);
     }
 }

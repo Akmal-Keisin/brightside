@@ -189,7 +189,7 @@ The first release has exactly two roles. A dedicated instructor role is delibera
 
 | Priority | Items |
 | --- | --- |
-| **Must** | Auth and verification, roles, mandatory admin 2FA, catalog, course detail, free preview, admin course/curriculum authoring, quiz builder, publish/archive, paid and free enrollment, Midtrans checkout, webhook idempotency, receipt email, player, three content types, progress tracking, quiz attempts, dashboard, order history, audit writes for refunds/grants/revokes, access control, responsive UI, WCAG AA basics, SEO basics, tests, deployment |
+| **Must** | Auth and verification, roles, catalog, course detail, free preview, admin course/curriculum authoring, quiz builder, publish/archive, paid and free enrollment, Midtrans checkout, webhook idempotency, receipt email, player, three content types, progress tracking, quiz attempts, dashboard, order history, audit writes for refunds/grants/revokes, access control, responsive UI, WCAG AA basics, SEO basics, tests, deployment |
 | **Should** | Admin sales chart, completion email, related courses, search empty-state suggestions |
 | **Could** | Course reviews, in-app notifications, coupons, certificates, notes/bookmarks, social login, UI localization, duplicate course, video upload inside the app, audit log viewer |
 | **Won't (this release)** | Subscriptions, live classes, multi-vendor, mobile apps, offline, Q&A/comments, affiliate, drip content |
@@ -248,9 +248,9 @@ Priorities use MoSCoW. "Done when" is the minimum acceptance condition for the f
 | `AUTH-07` | Must | A member can update name, email, avatar, headline, and bio. Changing email requires re-verification. | Profile changes persist; a changed email resets `email_verified_at` and sends a new verification email. |
 | `AUTH-08` | Must | A member can change their password by supplying the current password. | Wrong current password is rejected; the new password is hashed and other sessions remain valid unless "log out other devices" is chosen. |
 | `AUTH-09` | Must | A member can delete their account after confirming their password. | Account is deleted, enrollments and progress are removed, and order history retains the accounting snapshot, with direct identifiers minimized where legally permitted. |
-| `AUTH-10` | Must | Admin accounts must use two-factor authentication before production launch. | An admin without confirmed 2FA is forced through setup before reaching `/admin`; recovery codes are available. |
+| `AUTH-10` | ~~Must~~ Removed | ~~Admin accounts must use two-factor authentication before production launch.~~ Removed on 2026-10-21: two-factor authentication is disabled in the application and no longer enforced for admin access. | — |
 | `AUTH-11` | Must | Admin accounts are provisioned only by seeder/Artisan command. Public registration always creates members. | A crafted `role=admin` registration payload creates a member, never an admin. |
-| `AUTH-12` | Should | A member can enable or disable 2FA from security settings. | TOTP setup, confirmation, recovery codes, and disable-with-password all work. |
+| `AUTH-12` | ~~Should~~ Removed | ~~A member can enable or disable 2FA from security settings.~~ Removed on 2026-10-21 together with AUTH-10. | — |
 | `AUTH-13` | Could | Google social login. | Deferred to Phase 2. |
 | `AUTH-14` | Could | Passkey login. | Deferred to Phase 3. |
 
@@ -732,8 +732,8 @@ All routes are named and consumed by Wayfinder. Controllers live under `App\Http
 - Public course URLs use slugs. Order URLs use order numbers. Curriculum records use IDs inside `/admin`.
 - Every state-changing route uses POST/PUT/PATCH/DELETE and CSRF protection. The only exception is the gateway webhook, which is signature-verified.
 - The webhook route is excluded from CSRF in `bootstrap/app.php` and rate-limited separately.
-- Routes are grouped by middleware: `web`, `auth`, `verified`, `can:access-admin`, `admin.2fa`.
-- Fortify owns the `/user/two-factor-*` endpoints (enable, confirm, QR, recovery codes, disable); the security page calls them directly. Do not duplicate 2FA controllers. `admin.2fa` only enforces that an admin has confirmed 2FA before entering `/admin`.
+- Routes are grouped by middleware: `web`, `auth`, `verified`, `can:access-admin`.
+- Fortify owns the auth session and account flows (login, registration, password reset/confirm); the security settings page reuses the password endpoints. Do not duplicate auth controllers.
 - Page components map one-to-one to routes and live under `resources/js/pages`, using lowercase folders and PascalCase files (`catalog/Show.vue`, `learning/Player.vue`, `admin/courses/Edit.vue`).
 
 ### 8.3 Navigation
@@ -1464,7 +1464,7 @@ flowchart LR
 
 1. Route matched in `routes/web.php` or a domain route file.
 2. Global middleware (trusted proxies, CORS not needed for same-origin, CSRF, session).
-3. Route middleware (`auth`, `verified`, `can:access-admin`, `admin.2fa`, `course.enrolled`).
+3. Route middleware (`auth`, `verified`, `can:access-admin`, `course.enrolled`).
 4. Form Request validates and authorizes the payload.
 5. Controller delegates multi-step work to an Action; simple reads use Eloquent scopes.
 6. Action writes inside a transaction and dispatches domain events after commit.
@@ -1500,7 +1500,7 @@ app/
 │   │   ├── Checkout/
 │   │   ├── Learning/
 │   │   └── Settings/
-│   ├── Middleware/           EnsureCourseEnrollment (`course.enrolled`), EnsureAdminTwoFactor (`admin.2fa`)
+│   ├── Middleware/           EnsureAdmin (`admin`), EnsureCourseEnrollment (`course.enrolled`)
 │   └── Requests/
 │       ├── Admin/
 │       ├── Checkout/
@@ -1567,7 +1567,7 @@ erDiagram
 - **Course aggregate:** course, chapters, contents, quiz, questions, options. Edited together by admins. Publishing is a state transition on the aggregate root.
 - **Commerce aggregate:** order, payment, webhook event. Money state changes only through verified gateway events or admin refunds.
 - **Learning aggregate:** enrollment, content progress, quiz attempt, attempt answers. Progress is recalculated from content progress, never incremented blindly.
-- **Identity aggregate:** user, profile, sessions, 2FA. Managed by Fortify plus settings controllers.
+- **Identity aggregate:** user, profile, sessions. Managed by Fortify plus settings controllers.
 
 ### 10.6 Enums
 
@@ -1669,30 +1669,6 @@ Laravel auto-discovers policies that follow `App\Models\Course` → `App\Policie
 ```php
 Gate::define('access-admin', fn (User $user): bool => $user->isAdmin());
 ```
-
-**Admin 2FA gate**
-
-The role gate and the 2FA requirement are separate concerns. `access-admin` answers "is this an admin?"; `admin.2fa` answers "has this admin completed TOTP setup?" Keeping them separate means a newly provisioned admin can reach the security page but not the admin panel.
-
-```php
-final class EnsureAdminTwoFactor
-{
-    public function handle(Request $request, Closure $next): Response
-    {
-        $user = $request->user();
-
-        if ($user?->isAdmin() && $user->two_factor_confirmed_at === null) {
-            return redirect()
-                ->route('security.edit')
-                ->with('error', 'Set up two-factor authentication to access the admin area.');
-        }
-
-        return $next($request);
-    }
-}
-```
-
-Register the alias in `bootstrap/app.php` and apply it after `can:access-admin` on every `/admin` route. If an admin disables 2FA, the next admin request redirects back to setup.
 
 ### 10.8 Validation
 
@@ -2676,7 +2652,7 @@ Add `MustVerifyEmail` to the model when email verification is enabled.
 
 | Factory | States |
 | --- | --- |
-| `UserFactory` | `admin()`, `unverified()`, `withTwoFactor()` |
+| `UserFactory` | `admin()`, `unverified()` |
 | `CourseFactory` | `draft()`, `published()`, `archived()`, `free()`, `paid()` |
 | `ChapterFactory` | — |
 | `ContentFactory` | `article()`, `video()`, `quiz()` |
@@ -3276,8 +3252,8 @@ Use skeleton cards for deferred sections. Do not show a full-page spinner after 
 
 | Asset | Threat | Control |
 | --- | --- | --- |
-| Member accounts | Credential stuffing, brute force | Rate limiting, password policy, optional 2FA, generic errors |
-| Admin panel | Privilege escalation, session theft | Role gate, verified email, mandatory 2FA, secure cookies, least privilege |
+| Member accounts | Credential stuffing, brute force | Rate limiting, password policy, generic errors |
+| Admin panel | Privilege escalation, session theft | Role gate, verified email, secure cookies, least privilege |
 | Paid content | URL sharing, hotlinking | Enrollment checks, signed video URLs with short TTL, no permanent media URLs |
 | Payments | Forged webhook, replay, amount tampering | Signature verification, idempotency table, server-side totals, reconciliation |
 | Orders/PII | IDOR | Policies on every order, member, enrollment, and attempt |
@@ -3290,9 +3266,8 @@ Use skeleton cards for deferred sections. Do not show a full-page spinner after 
 
 ### 13.2 Authentication and session security
 
-- Enable Fortify registration, reset passwords, email verification, and 2FA.
+- Enable Fortify registration, reset passwords, and email verification.
 - Add `MustVerifyEmail` to `User`.
-- Admin 2FA is mandatory before production.
 - Passwords hashed with bcrypt (default) or Argon2id when available; never reversible encryption.
 - Session cookies: `HttpOnly`, `Secure`, `SameSite=Lax`.
 - Regenerate session ID on login; invalidate on logout.
@@ -3467,7 +3442,6 @@ Content-Security-Policy:
 | --- | --- |
 | `AUTH-01` | Registration creates a member, sends verification, rejects duplicate email |
 | `AUTH-03` | Unverified member is blocked from checkout and player |
-| `AUTH-10` | Admin without confirmed 2FA is redirected from `/admin`; confirmed admin passes |
 | `AUTH-11` | Registration payload with `role=admin` creates a member |
 | `CAT-02` | Catalog excludes draft/archived courses |
 | `CAT-08` | Guest can view free-preview article; cannot view paid lesson |
@@ -3794,7 +3768,6 @@ A requirement is done when:
 - [ ] Legal pages published.
 - [ ] Backup and restore tested.
 - [ ] Error tracking and uptime monitoring active.
-- [ ] Admin 2FA enforced.
 - [ ] Seed admin created; no demo data in production.
 - [ ] Sitemap and robots correct.
 - [ ] Lighthouse and accessibility checks pass.
@@ -3842,7 +3815,7 @@ The document is implementation-ready under the following assumptions. Confirm or
 | 9 | Reviews in MVP | No, Phase 2 | Removes moderation and rating schema from launch |
 | 10 | Certificates in MVP | No, Phase 2 | Removes PDF generation and verification |
 | 11 | Coupons in MVP | No, Phase 2 | Removes discount rules and redemption table |
-| 12 | Admin 2FA | Required before production | Security baseline |
+| 12 | Admin 2FA | Removed from scope | Decided 2026-10-21; replaces the security baseline item |
 | 13 | Email provider | Postmark/SES/Resend | Deliverability and cost |
 | 14 | Hosting | Laravel Cloud | Managed MariaDB, queues, SSR, storage |
 | 15 | Brand name | Brightside working title | Trademark/domain check before public launch |

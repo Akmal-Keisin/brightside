@@ -13,7 +13,6 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
-use Laravel\Fortify\TwoFactorAuthenticatable;
 
 /**
  * @property int $id
@@ -28,9 +27,6 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $terms_accepted_at
  * @property string|null $terms_version
  * @property Carbon|null $last_login_at
- * @property string|null $two_factor_secret
- * @property string|null $two_factor_recovery_codes
- * @property Carbon|null $two_factor_confirmed_at
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -40,7 +36,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, Notifiable;
 
     /** @return array<string, string> */
     protected function casts(): array

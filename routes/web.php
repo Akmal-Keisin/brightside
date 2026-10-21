@@ -47,7 +47,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     Route::prefix('admin')
         ->name('admin.')
-        ->middleware(['admin', 'admin.2fa'])
+        ->middleware('admin')
         ->group(function (): void {
             Route::get('/', Admin\DashboardController::class)->name('dashboard');
 

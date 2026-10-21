@@ -8,8 +8,6 @@ export type User = {
     is_admin: boolean;
     headline: string | null;
     bio: string | null;
-    two_factor_enabled: boolean;
-    two_factor_pending: boolean;
     created_at: string;
     updated_at: string;
 };
