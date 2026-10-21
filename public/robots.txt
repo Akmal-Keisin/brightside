@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /learning
+Disallow: /checkout
+Disallow: /orders
+Disallow: /settings
+Disallow: /webhooks
+Disallow: /dev
